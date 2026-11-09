@@ -1,0 +1,4 @@
+-r requirements.txt
+# Complementos reales de la demostración avanzada de MLOps.
+prefect>=3.2,<4
+mlflow>=3.0,<5

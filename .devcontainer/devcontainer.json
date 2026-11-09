@@ -1,0 +1,11 @@
+{
+  "name": "AI DataOps Guardian — Python 3.11",
+  "build": {"dockerfile": "../Dockerfile", "context": ".."},
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+  "customizations": {"vscode": {"extensions": [
+    "ms-python.python", "ms-python.vscode-pylance", "ms-toolsai.jupyter", "ms-azuretools.vscode-docker"
+  ]}},
+  "remoteUser": "root",
+  "postCreateCommand": "python src/check_env.py"
+}

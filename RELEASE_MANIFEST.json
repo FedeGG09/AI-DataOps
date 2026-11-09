@@ -1,0 +1,16 @@
+{
+  "project": "AI DataOps Guardian",
+  "version": "0.3.0",
+  "platform": "Windows 11 + React/Vite + FastAPI local + Cloudflare Tunnel + Ollama local",
+  "target_repository": "https://github.com/FedeGG09/AI-DataOps-Guardian",
+  "validated": {
+    "backend_pytest": "10 passed",
+    "cloudflare_proxy_node_tests": "7 passed",
+    "typescript_syntax": "validated with TypeScript transpileModule",
+    "frontend_npm_build": "not run: npm dependencies not present in build environment",
+    "cloudflare_live_tunnel": "not tested against user Cloudflare account or local Windows"
+  },
+  "secrets_included": false,
+  "first_step": "scripts/instalar.ps1",
+  "doc": "README.md"
+}

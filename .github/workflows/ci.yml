@@ -48,6 +48,8 @@ jobs:
       - name: Instalación reproducible
         # npm ci NO actualiza el lockfile. Si package.json y lock no coinciden, falla.
         run: npm ci --no-audit --no-fund
+      - name: Validar proxy Pages (autenticación, rutas y headers)
+        run: node --test tests/proxy.test.mjs
       - name: Comprobar tipos y construir React
         run: npm run build
 

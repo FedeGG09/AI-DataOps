@@ -1,6 +1,6 @@
 /**
  * AI DataOps Guardian — laboratorio de la Diplomatura.
- * UI deliberadamente desacoplada del backend: Cloudflare opera en modo DEMO.
+ * UI deliberadamente desacoplada del backend: Cloudflare opera en DEMO y LIVE mediante Pages Functions y Tunnel.
  * Cuando React se sirve localmente con Vite, /api se resuelve con el proxy local.
  */
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -13,7 +13,7 @@ import {
 import type { HistoryItem, Mode, RunEvent, RunResult, ScenarioId, RunStatus } from './types'
 import { demoRun, scenarios } from './demo'
 import { buildInfo } from './buildInfo'
-import { getDashboard, getHealth, getOllama, runPipeline } from './api'
+import { getDashboard, getHealth, getOllama, runPipeline, getGuardianKey, setGuardianKey, clearGuardianKey } from './api'
 
 type View = 'dashboard' | 'laboratory' | 'architecture' | 'learning' | 'history' | 'cicd'
 const localHost = ['localhost', '127.0.0.1'].includes(window.location.hostname)
@@ -71,8 +71,8 @@ function Architecture() {
     <div className="section-heading"><span className="eyebrow">DISEÑO DEL SISTEMA</span><h2>Cómo funciona Guardian</h2><p>Separación por responsabilidad, no por complejidad accidental.</p></div>
     <div className="arch-grid">
       <div className="arch-node bright"><Cloud size={24}/><b>Frontend React</b><small>Cloudflare Pages · Vite</small><span>Panel de laboratorio + modo demo</span></div>
-      <div className="arch-arrow"><ArrowRight size={24}/><small>HTTP / API</small></div>
-      <div className="arch-node"><Server size={24}/><b>FastAPI local</b><small>127.0.0.1:8000</small><span>Validación, orquestación y auditoría</span></div>
+      <div className="arch-arrow"><ArrowRight size={24}/><small>Pages Function → Access → Tunnel</small></div>
+      <div className="arch-node"><Server size={24}/><b>FastAPI local</b><small>127.0.0.1:8000 · protegido</small><span>Validación, orquestación y auditoría</span></div>
     </div>
     <div className="arch-pieces">
       <div><IconBubble><Database size={19}/></IconBubble><b>Data Science</b><span>Pandas · Scikit-learn · PSI</span></div>
@@ -80,7 +80,7 @@ function Architecture() {
       <div><IconBubble tone="purple"><Bot size={19}/></IconBubble><b>Agente local</b><span>Ollama / Llama 3.1 · Tool calling</span></div>
       <div><IconBubble tone="gold"><ShieldCheck size={19}/></IconBubble><b>Control humano</b><span>Catálogo de acciones seguras</span></div>
     </div>
-    <div className="hint"><ShieldCheck size={18}/><span>Un frontend público NO accede directamente a Ollama ni a una API privada. En Cloudflare la demo es autónoma; para ejecutar el laboratorio real abrí React localmente.</span></div>
+    <div className="hint"><ShieldCheck size={18}/><span>En Cloudflare, /api atraviesa Pages Functions → Access → Tunnel → FastAPI local → Ollama. Nunca se expone Ollama en Internet; para LIVE se requiere clave de laboratorio.</span></div>
   </div>
 }
 function Learning({ onNavigate }: { onNavigate: (v: View) => void }) {
@@ -99,7 +99,7 @@ export default function App() {
   const [view, setView] = useState<View>('dashboard')
   const [menuOpen, setMenuOpen] = useState(false)
   const [connected, setConnected] = useState(false)
-  const [source, setSource] = useState<'demo' | 'local'>(localHost ? 'local' : 'demo')
+  const [source, setSource] = useState<'demo' | 'live'>(localHost ? 'live' : 'demo')
   const [scenario, setScenario] = useState<ScenarioId>('schema_change')
   const [mode, setMode] = useState<Mode>('script')
   const [useLLM, setUseLLM] = useState(true)
@@ -108,10 +108,11 @@ export default function App() {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [ollama, setOllama] = useState<string>('Sin consultar')
   const [notice, setNotice] = useState('')
+  const [keyInput, setKeyInput] = useState(getGuardianKey())
   const onNavigate = (v: View) => { setView(v); setMenuOpen(false) }
 
   async function refresh() {
-    if (source !== 'local') { setConnected(false); setOllama('No disponible en modo demo'); return }
+    if (source !== 'live') { setConnected(false); setOllama('No disponible en modo demo'); return }
     try {
       const health = await getHealth()
       if (health.status !== 'ok') throw new Error('API no disponible')
@@ -122,11 +123,11 @@ export default function App() {
         const o = await getOllama()
         setOllama(o.reachable ? (o.installed ? `Listo: ${o.model}` : `Modelo ${o.model} no instalado`) : 'Servicio Ollama apagado')
       } catch { setOllama('No se pudo consultar Ollama') }
-      setNotice('Backend local disponible')
+      setNotice('Backend LIVE conectado correctamente')
     } catch {
       setConnected(false)
-      setOllama('Backend local desconectado')
-      setNotice('No se detectó FastAPI. Podés cambiar a modo demostración.')
+      setOllama('Backend LIVE desconectado')
+      setNotice('FastAPI no responde. Comprobá clave, backend y túnel; o seleccioná DEMO.')
     }
   }
   useEffect(() => { void refresh() }, [source]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -137,8 +138,8 @@ export default function App() {
     setNotice('')
     try {
       let result: RunResult
-      if (source === 'local') {
-        if (!connected) throw new Error('Backend no conectado. Iniciá scripts/iniciar-backend.ps1 o seleccioná modo demostración.')
+      if (source === 'live') {
+        if (!connected) throw new Error('Backend LIVE no conectado. Verificá tu clave y el estado del túnel.')
         result = await runPipeline(scenario, mode, useLLM, approve)
         const data = await getDashboard()
         setHistory(data.runs)
@@ -155,7 +156,7 @@ export default function App() {
       { label: 'Ejecuciones registradas', value: source === 'demo' ? (run ? '01' : '00') : `${runs}`.padStart(2, '0'), icon: Terminal, caption: 'Sesión de laboratorio', tone: 'mint' },
       { label: 'Escenarios disponibles', value: '06', icon: Boxes, caption: 'Incidentes reproducibles', tone: 'blue' },
       { label: 'PSI máximo', value: hasDrift ? String(run?.metrics.max_psi) : '—', icon: Activity, caption: 'Calculado en pipeline', tone: 'gold' },
-      { label: 'Motor de ejecución', value: source === 'demo' ? 'DEMO' : connected ? 'LOCAL' : 'OFF', icon: Server, caption: source === 'demo' ? 'Simulación del navegador' : 'FastAPI + CPU', tone: 'purple' },
+      { label: 'Motor de ejecución', value: source === 'demo' ? 'DEMO' : connected ? 'LIVE' : 'OFF', icon: Server, caption: source === 'demo' ? 'Simulación del navegador' : 'FastAPI local + Llama 3', tone: 'purple' },
     ]
   }, [history, source, run, connected])
 
@@ -167,7 +168,7 @@ export default function App() {
       <div className="sidebar-bottom">
         <div className="sidebar-info"><div className="tiny-icon"><BookOpen size={16}/></div><div><b>Fundamentos de IA</b><span>Diplomatura · Unidad 01</span></div></div>
         <div className="sidebar-separator"/>
-        <div className="online-status"><span className={`status-led ${connected ? 'online' : ''}`}/><span>{source === 'demo' ? 'Simulación en navegador' : connected ? 'Motor local conectado' : 'Backend sin conexión'}</span></div>
+        <div className="online-status"><span className={`status-led ${connected ? 'online' : ''}`}/><span>{source === 'demo' ? 'Simulación en navegador' : connected ? 'Motor LIVE conectado' : 'Backend sin conexión'}</span></div>
         <span className="sidebar-version">Versión {buildInfo.version} · Docente</span>
       </div>
     </aside>
@@ -180,9 +181,18 @@ export default function App() {
       <main className="content">
         <div className="hero-row"><div><div className="eyebrow"><span className="eyebrow-line"/> AI AUTOMATION · DATA SCIENCE</div><h1>{view === 'dashboard' ? 'Centro de operaciones' : view === 'laboratory' ? 'Laboratorio de incidentes' : view === 'architecture' ? 'Arquitectura del sistema' : view === 'learning' ? 'Guía de aprendizaje' : view === 'history' ? 'Historial de ejecuciones' : 'CI/CD y despliegues'}</h1><p className="hero-subtitle">De scripts rígidos a sistemas que observan, validan y toman decisiones supervisadas.</p></div><span className="hero-pill"><span className="pulse-dot"/> ENTORNO EDUCATIVO</span></div>
         <div className="connection-banner">
-          <div className="connection-main"><IconBubble tone={source === 'local' ? 'mint' : 'blue'}>{source === 'local' ? <Server size={19}/> : <Globe2 size={19}/>}</IconBubble><div><b>{source === 'demo' ? 'Modo demostración — Cloudflare compatible' : connected ? 'Backend FastAPI conectado' : 'Backend local sin conexión'}</b><span>{source === 'demo' ? 'Los resultados son ilustrativos. No se ejecuta Python ni Ollama.' : connected ? `Python y modelos corriendo en tu PC · ${ollama}` : 'Iniciá el servicio local desde PowerShell para ejecutar código real.'}</span></div></div>
-          <div className="connection-actions"><select value={source} onChange={e => { setSource(e.target.value as 'demo' | 'local'); setRun(null) }} aria-label="Origen de ejecución"><option value="demo">Demo</option>{localHost && <option value="local">Local</option>}</select><button className="outline-button" onClick={() => void refresh()}><RefreshCw size={15}/> Verificar</button></div>
+          <div className="connection-main"><IconBubble tone={source === 'live' ? 'mint' : 'blue'}>{source === 'live' ? <Server size={19}/> : <Globe2 size={19}/>}</IconBubble><div><b>{source === 'demo' ? 'Modo demostración — Cloudflare compatible' : connected ? 'Backend FastAPI conectado' : 'Backend LIVE sin conexión'}</b><span>{source === 'demo' ? 'Los resultados son ilustrativos. No se ejecuta Python ni Ollama.' : connected ? `Python y modelos corriendo en tu PC · ${ollama}` : 'Verificá la clave, FastAPI y el túnel (si accedés desde Cloudflare).'}</span></div></div>
+          <div className="connection-actions"><select value={source} onChange={e => { setSource(e.target.value as 'demo' | 'live'); setRun(null) }} aria-label="Origen de ejecución"><option value="demo">Demo</option><option value="live">LIVE · Motor real</option></select><button className="outline-button" onClick={() => void refresh()}><RefreshCw size={15}/> Verificar</button></div>
         </div>
+        {source === 'live' && <div className="live-credentials">
+          <div className="live-credentials-heading"><ShieldCheck size={17}/><div><b>Acceso privado a Guardian LIVE</b><small>La clave se guarda sólo en esta sesión del navegador. Nunca va en GitHub ni en Cloudflare como variable VITE_.</small></div></div>
+          <div className="live-credentials-form">
+            <input type="password" autoComplete="off" value={keyInput} onChange={e => setKeyInput(e.target.value)} placeholder="Pegá GUARDIAN_API_KEY desde tu PC" aria-label="Clave del laboratorio" />
+            <button onClick={() => { setGuardianKey(keyInput); void refresh() }} disabled={keyInput.trim().length < 32}>Conectar LIVE</button>
+            <button className="live-clear" onClick={() => { clearGuardianKey(); setKeyInput(''); setConnected(false); setNotice('Clave borrada de esta sesión.') }}>Borrar clave</button>
+          </div>
+          <small>Modo {localHost ? 'local Vite → FastAPI' : 'remoto Pages → Function → Access → Tunnel → FastAPI'}. No compartas la clave durante la clase.</small>
+        </div>}
         {notice && <div className="notice"><CircleAlert size={16}/>{notice}<button onClick={() => setNotice('')} aria-label="Cerrar"><X size={15}/></button></div>}
 
         {(view === 'dashboard' || view === 'laboratory') && <>
@@ -194,7 +204,7 @@ export default function App() {
               <p className="field-help">{scenarios.find(s => s.id === scenario)?.description}</p>
               <label className="field-label">02 — Elegí cómo resolverlo</label>
               <div className="mode-tabs">{(['script', 'pipeline', 'agent'] as Mode[]).map(m => <button key={m} onClick={() => { setMode(m); setRun(null) }} className={mode === m ? 'selected' : ''}>{m === 'script' ? <Code2 size={17}/> : m === 'pipeline' ? <GitBranch size={17}/> : <Bot size={17}/>}<span>{modeLabels[m]}</span></button>)}</div>
-              {mode === 'agent' && <label className="switch-row"><input type="checkbox" checked={useLLM} onChange={e => setUseLLM(e.target.checked)}/><span className="switch-track"/><div><b>Habilitar Llama 3.1 local</b><small>{source === 'demo' ? 'En la web pública solo se simula' : 'Consulta real mediante Ollama en 127.0.0.1'}</small></div></label>}
+              {mode === 'agent' && <label className="switch-row"><input type="checkbox" checked={useLLM} onChange={e => setUseLLM(e.target.checked)}/><span className="switch-track"/><div><b>Habilitar Llama 3.1 local</b><small>{source === 'demo' ? 'Elegí LIVE y configurá la clave para ejecutar el LLM real' : 'Consulta real a Ollama desde el backend de tu PC'}</small></div></label>}
               <button className="primary-button" disabled={busy} onClick={() => void execute()}>{busy ? <RefreshCw size={18} className="spin"/> : <Play size={17} fill="currentColor"/>}{busy ? 'Ejecutando...' : 'Ejecutar experimento'}<ArrowRight size={17}/></button>
               <div className="lab-help"><ShieldCheck size={16}/><span>Dataset sintético · Ejecuciones auditables · Cambios sujetos a aprobación</span></div>
             </section>
@@ -234,12 +244,12 @@ export default function App() {
               ['05', 'Merge a main (CD)', 'Fusionar solo con CI verde y verificar el commit publicado aquí.'],
             ].map(([num, title, detail]) => <div className="cicd-step" key={num}><span>{num}</span><div><b>{title}</b><p>{detail}</p></div></div>)}
           </div>
-          <div className="hint"><ShieldCheck size={18}/><span>El frontend público utiliza simulaciones: FastAPI y Ollama permanecen en tu equipo. Un build de Cloudflare no acredita que el backend local esté conectado.</span></div>
+          <div className="hint"><ShieldCheck size={18}/><span>DEMO es autónomo. LIVE usa Pages Functions, Cloudflare Access y Tunnel para acceder a FastAPI + Ollama locales. Un build correcto no prueba que tu PC esté encendida.</span></div>
         </section>}
         {view === 'architecture' && <Architecture/>}
         {view === 'learning' && <Learning onNavigate={onNavigate}/>}
         {view === 'history' && <div className="panel spacious"><div className="section-heading"><span className="eyebrow">AUDITORÍA</span><h2>Últimas ejecuciones</h2><p>Las ejecuciones reales quedan persistidas en SQLite. En demo solo se conserva la sesión actual.</p></div><div className="history-list">{(source === 'demo' ? (run ? [{ ...run, created_at: new Date().toISOString() }] : []) : history).map(item => <div className="history-row" key={item.run_id}><div><b>{scenarios.find(s => s.id === item.scenario)?.name ?? item.scenario}</b><small>{modeLabels[item.mode]} · {new Date(item.created_at).toLocaleString('es-AR')}</small></div><StatusTag status={item.status}/></div>)}{(source === 'demo' ? !run : history.length === 0) && <div className="history-empty"><Clock3 size={27}/><p>No hay ejecuciones. Abrí el laboratorio para realizar la primera.</p><button className="text-link" onClick={() => onNavigate('laboratory')}>Ir al laboratorio <ArrowRight size={15}/></button></div>}</div></div>}
-        <footer className="footer"><span><span className="footer-dot"/> AI DataOps Guardian · Material docente</span><span>Python + React + Ollama · v0.1.0</span></footer>
+        <footer className="footer"><span><span className="footer-dot"/> AI DataOps Guardian · Material docente</span><span>React + Cloudflare Tunnel + Ollama · v0.3.0</span></footer>
       </main>
     </div>
   </div>

@@ -1,10 +1,12 @@
-﻿# Setup integral para Windows 11 / PowerShell, sin requerir Docker.
+# Setup integral para Windows 11 / PowerShell, sin requerir Docker.
 # Ejecutar desde la raíz: powershell -ExecutionPolicy Bypass -File .\scripts\instalar.ps1
 $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 Set-Location $Root
 Write-Host '[1/5] Creando archivo .env si no existe' -ForegroundColor Cyan
 if (-not (Test-Path '.env')) { Copy-Item '.env.example' '.env' }
+& powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $Root 'scripts\generar-clave.ps1')
+if ($LASTEXITCODE -ne 0) { throw 'No se pudo generar la clave privada' }
 Write-Host '[2/5] Buscando Python...' -ForegroundColor Cyan
 $PythonCmd = $null
 try { & py -3.11 --version 2>$null; if ($LASTEXITCODE -eq 0) { $PythonCmd = @('py', '-3.11') } } catch {}
@@ -30,3 +32,4 @@ Write-Host 'Instalación finalizada. Abrí una terminal para el backend y otra p
 Write-Host 'Backend: powershell -ExecutionPolicy Bypass -File .\scripts\iniciar-backend.ps1'
 Write-Host 'Frontend: powershell -ExecutionPolicy Bypass -File .\scripts\iniciar-frontend.ps1'
 Write-Host 'Si falta el modelo Llama, ejecutá: ollama pull llama3.1:8b'
+Write-Host 'Para conectar LIVE: powershell -ExecutionPolicy Bypass -File .\scripts\mostrar-clave.ps1 -Copiar'

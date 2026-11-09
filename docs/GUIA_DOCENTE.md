@@ -1,3 +1,5 @@
+> **Versión v0.3:** para el modo LIVE remoto y seguridad, complementar esta guía con `02_CLOUDFLARE_PAGES_TUNNEL.md` y `03_QUE_HACE_EL_PROYECTO.md`.
+
 # Guía docente · Unidad 1 — AI DataOps Guardian
 
 ## Propósito

@@ -8,7 +8,7 @@ declare const __GUARDIAN_BRANCH__: string
 declare const __GUARDIAN_PLATFORM__: string
 
 export const buildInfo = {
-  version: '0.2.0',
+  version: '0.3.0',
   commit: __GUARDIAN_COMMIT__.slice(0, 7),
   fullCommit: __GUARDIAN_COMMIT__,
   branch: __GUARDIAN_BRANCH__,

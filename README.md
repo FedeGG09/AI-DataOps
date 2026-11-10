@@ -2,7 +2,7 @@
 
 **React + Cloudflare Pages (DEMO y LIVE) ↔ Pages Function ↔ Cloudflare Access ↔ Tunnel ↔ FastAPI + Ollama en Windows.**
 
-## ¿Qué es?
+## ¿Qué es? sd
 
 Laboratorio didáctico de la Unidad 1 de una diplomatura de AI Automation para Data Scientists.
 Enseña la transición del script Python lineal a pipelines observables y agentes que consultan
@@ -91,3 +91,5 @@ la integración GitHub de Pages realiza despliegues por commit.
 
 **Nota:** La instalación de npm requiere acceso al registro de paquetes de Node. Si el ZIP no trae
 `frontend/package-lock.json`, ejecutá `scripts/instalar.ps1` para generarlo antes del push.
+
+<!-- Redeploy Cloudflare Pages v0.4 -->

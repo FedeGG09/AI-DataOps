@@ -5,7 +5,8 @@
  * Secrets de Cloudflare Access sin incorporarlos al bundle de React.
  * El usuario aún debe ingresar su clave personal/de laboratorio en React.
  *
- * GUARDIAN_API_ORIGIN             = https://api.tudominio.com (URL sin path)
+ * GUARDIAN_API_ORIGIN             = https://tu-tunel.trycloudflare.com (URL sin path)
+ * GUARDIAN_API_KEY                = secreto en Pages, mismo valor que el .env LOCAL
  * GUARDIAN_ACCESS_CLIENT_ID       = Access service token ID (SECRETO)
  * GUARDIAN_ACCESS_CLIENT_SECRET   = Access service token secret (SECRETO)
  * GUARDIAN_ALLOW_UNPROTECTED_ORIGIN = 1 SOLO para Quick Tunnel de prueba.
@@ -30,10 +31,27 @@ export async function onRequest({ request, env }) {
   if (request.method !== ALLOWED.get(incoming.pathname)) return error(405, 'Método no permitido');
   if (incoming.search) return error(400, 'No se admiten parámetros de consulta en esta API');
 
+  // Doble validación: Cloudflare conoce el secreto fijo y FastAPI lo vuelve a verificar.
+  // Nunca enviamos el secreto al navegador, ni lo retornamos por ningún endpoint.
+  const secret = env.GUARDIAN_API_KEY || '';
+  if (secret.length < 32 || secret.length > 256) {
+    return error(503, 'Falta GUARDIAN_API_KEY como Secret de Cloudflare Pages');
+  }
   const key = request.headers.get('X-Guardian-Key') || '';
   if (key.length < 32 || key.length > 256) {
-    return error(401, 'Ingresá la clave del laboratorio en el modo LIVE');
+    return error(401, 'Ingresá la clave fija del laboratorio');
   }
+  // Comparamos SHA-256 de longitud fija para evitar comparar caracteres directamente.
+  const encoder = new TextEncoder();
+  const [keyHash, secretHash] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(key)),
+    crypto.subtle.digest('SHA-256', encoder.encode(secret)),
+  ]);
+  const left = new Uint8Array(keyHash);
+  const right = new Uint8Array(secretHash);
+  let difference = 0;
+  for (let i = 0; i < left.length; i++) difference |= left[i] ^ right[i];
+  if (difference !== 0) return error(401, 'Clave del laboratorio incorrecta');
   let body;
   if (request.method === 'POST') {
     const type = request.headers.get('Content-Type') || '';
@@ -77,8 +95,8 @@ export async function onRequest({ request, env }) {
     return error(503, 'GUARDIAN_API_ORIGIN contiene una URL inválida');
   }
   const id = env.GUARDIAN_ACCESS_CLIENT_ID || '';
-  const secret = env.GUARDIAN_ACCESS_CLIENT_SECRET || '';
-  if (Boolean(id) !== Boolean(secret)) {
+  const accessSecret = env.GUARDIAN_ACCESS_CLIENT_SECRET || '';
+  if (Boolean(id) !== Boolean(accessSecret)) {
     return error(503, 'Configuración incompleta de Cloudflare Access: faltan credenciales');
   }
   if (!id && env.GUARDIAN_ALLOW_UNPROTECTED_ORIGIN !== '1') {
@@ -93,9 +111,9 @@ export async function onRequest({ request, env }) {
     'Accept': 'application/json',
   });
   if (request.method === 'POST') headers.set('Content-Type', 'application/json');
-  if (id && secret) {
+  if (id && accessSecret) {
     headers.set('CF-Access-Client-Id', id);
-    headers.set('CF-Access-Client-Secret', secret);
+    headers.set('CF-Access-Client-Secret', accessSecret);
   }
   const target = new URL(incoming.pathname, origin);
   try {
